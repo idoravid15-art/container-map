@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>מפת המכולה</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14171A; --bg2: #1c2024; --panel: #21262b; --panel2: #262c32;
+    --border: #33393f; --text: #ece8de; --text-dim: #9aa3ab;
+    --rust: #B5502A; --yellow: #F2C230;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; font-family: 'Heebo', sans-serif;
+    background: radial-gradient(ellipse at 50% -10%, #23282d 0%, var(--bg) 60%);
+    color: var(--text); min-height: 100vh;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  header {
+    padding: 14px 16px 10px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .title { font-weight: 900; font-size: 19px; letter-spacing: .5px; }
+  .code {
+    font-size: 11px; color: var(--yellow); letter-spacing: 2px;
+    background: #00000030; padding: 2px 8px; border-radius: 3px;
+    border: 1px solid #ffffff14; width: fit-content; margin-top: 2px;
+  }
+  .hazard {
+    width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
+    background: repeating-linear-gradient(45deg, var(--yellow) 0 6px, #1a1a1a 6px 12px);
+    box-shadow: inset 0 0 0 2px #00000040;
+  }
+  .sync {
+    font-size: 10px; color: var(--text-dim); display: flex; align-items: center; gap: 4px;
+  }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #4caf7d; }
+  .sync-dot.err { background: #d9534f; }
+  .sync-dot.busy { background: var(--yellow); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+
+  main { padding-bottom: 80px; }
+
+  .canvas-wrap { position: relative; width: 100%; height: 46vh; min-height: 300px; background: #0e1012; touch-action: none; }
+  .canvas-wrap canvas { display: block; }
+  .hint {
+    position: absolute; bottom: 8px; right: 8px; left: 8px; font-size: 11px;
+    color: var(--text-dim); text-align: center; background: #00000055;
+    padding: 5px 8px; border-radius: 6px; pointer-events: none;
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-dim); }
+  .dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  .section { padding: 14px 16px; }
+  .level-tabs { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; }
+  .level-btn {
+    padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text-dim); font-size: 13px;
+    white-space: nowrap; font-family: 'Heebo'; font-weight: 500; cursor: pointer;
+  }
+  .level-btn.active { background: var(--rust); color: #fff; border-color: var(--rust); }
+
+  .grid { display: grid; gap: 8px; justify-content: center; }
+  .cell {
+    aspect-ratio: 1; border-radius: 8px; border: 1.5px solid var(--border);
+    background: var(--panel); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px;
+    min-width: 52px; min-height: 52px; position: relative;
+    color: var(--text-dim); font-size: 11px; cursor: pointer;
+  }
+  .cell.filled { border-color: transparent; color: #fff; }
+  .cell.found { outline: 3px solid var(--yellow); outline-offset: 1px; }
+  .cell-code { font-size: 9px; opacity: .75; }
+  .cell-count {
+    position: absolute; top: -6px; left: -6px; background: var(--yellow); color: #1a1a1a;
+    font-size: 10px; font-weight: 700; border-radius: 50%; width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  input, button { font-family: 'Heebo', sans-serif; }
+  .input {
+    width: 100%; padding: 11px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text); font-size: 15px;
+  }
+  .input:focus { outline: none; border-color: var(--rust); }
+  .result {
+    padding: 12px 14px; border-radius: 9px; background: var(--panel);
+    border: 1px solid var(--border); margin-top: 8px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  .result-name { font-weight: 700; font-size: 14px; }
+  .result-meta { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .result-coord {
+    font-size: 12px; background: #00000040; padding: 6px 10px; border-radius: 6px;
+    color: var(--yellow); white-space: nowrap; border: none; cursor: pointer;
+  }
+  .empty { text-align: center; color: var(--text-dim); padding: 30px 10px; font-size: 13px; }
+
+  .field { margin-bottom: 14px; }
+  .label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+  .row3 { display: flex; gap: 8px; }
+  .row3 > div { flex: 1; }
+  .warn { font-size: 12px; color: var(--yellow); margin-top: 6px; line-height: 1.6; }
+  .note {
+    font-size: 12px; color: var(--text-dim); background: var(--panel);
+    border: 1px solid var(--border); padding: 10px 12px; border-radius: 8px;
+    margin-top: 10px; line-height: 1.6;
+  }
+  .btn {
+    padding: 10px 16px; border-radius: 8px; border: none; font-weight: 700;
+    font-size: 14px; background: var(--rust); color: #fff; cursor: pointer;
+  }
+  .btn.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  .btn:active { transform: scale(.98); }
+
+  .tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 64px;
+    background: var(--bg2); border-top: 1px solid var(--border); display: flex; z-index: 20;
+  }
+  .tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; color: var(--text-dim); font-size: 10.5px; background: none; border: none; cursor: pointer;
+  }
+  .tab.active { color: var(--yellow); }
+  .tab-icon { font-size: 18px; }
+
+  .fab {
+    position: fixed; bottom: 76px; left: 16px; width: 52px; height: 52px; border-radius: 50%;
+    background: var(--yellow); color: #1a1a1a; font-size: 26px; font-weight: 700;
+    border: none; box-shadow: 0 4px 14px #00000060; z-index: 25;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+
+  .sheet-backdrop {
+    position: fixed; inset: 0; background: #00000090; z-index: 30;
+    display: flex; align-items: flex-end;
+  }
+  .sheet {
+    background: var(--bg2); width: 100%; border-radius: 16px 16px 0 0;
+    padding: 18px 16px 22px; max-height: 82vh; overflow-y: auto;
+    border-top: 1px solid var(--border);
+  }
+  .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 3px; margin: 0 auto 14px; }
+  .sheet-title { font-weight: 900; font-size: 16px; margin-bottom: 12px; }
+  .item-row {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 9px;
+    padding: 10px 12px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .icon-btn {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-dim); padding: 5px 9px; font-size: 12px; cursor: pointer;
+  }
+  .loading { text-align: center; padding: 60px 20px; color: var(--text-dim); }
+  .setup-box { max-width: 480px; margin: 40px auto; padding: 0 16px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ====== CONFIG: paste your Firebase Realtime Database URL here ====== -->
+<script>
+  // 1) Create a free Firebase project -> Realtime Database
+  // 2) Paste the database URL below (looks like: https://your-project-default-rtdb.europe-west1.firebasedatabase.app)
+  // 3) DATA_PATH is a "secret path" — change it to something long and random of your own
+  const FIREBASE_DB_URL = "https://container-map-2a12d-default-rtdb.europe-west1.firebasedatabase.app";
+  const DATA_PATH = "container-Tq8nWc31xLp5Zk"; // נתיב אקראי — משמש כהגנה קלה
+</script>
+
+<div id="setup" class="setup-box hidden">
+  <h2 style="font-weight:900">חסרה הגדרת מסד נתונים</h2>
+  <p style="color:var(--text-dim);font-size:14px;line-height:1.7">
+    כדי שהנתונים יהיו משותפים לכל הצוות, צריך לחבר מסד נתונים חינמי של Firebase.
+    פתח/י את קובץ ה-HTML, ובחלק העליון (CONFIG) הדבק/י את כתובת ה-Realtime Database
+    במקום <span class="mono">PASTE_YOUR_FIREBASE_URL_HERE</span>.
+  </p>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <div>
+      <div class="title" id="h-name">המכולה שלנו</div>
+      <div class="code mono" id="h-code">MCLU-0001</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="sync"><span class="sync-dot" id="sync-dot"></span><span id="sync-text">מסונכרן</span></div>
+      <div class="hazard"></div>
+    </div>
+  </header>
+
+  <main>
+    <div id="view-3d">
+      <div class="canvas-wrap" id="canvas-wrap">
+        <div class="hint">גרירה לסיבוב · צביטה/גלגלת לזום · הקשה על תא לפרטים</div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div id="view-map" class="section hidden">
+      <div class="level-tabs" id="level-tabs"></div>
+      <div class="grid" id="floor-grid"></div>
+      <div class="warn">הקצה המסומן בצהוב בתלת־מימד = דלת המכולה. הקש/י על תא כדי לראות או להוסיף פריטים.</div>
+    </div>
+
+    <div id="view-search" class="section hidden">
+      <input class="input" id="search-input" placeholder="חיפוש פריט או קטגוריה...">
+      <div id="search-results"></div>
+    </div>
+
+    <div id="view-settings" class="section hidden">
+      <div class="field">
+        <label class="label">שם המכולה</label>
+        <input class="input" id="set-name">
+      </div>
+      <div class="field">
+        <label class="label">קוד מכולה</label>
+        <input class="input mono" id="set-code">
+      </div>
+      <div class="field">
+        <label class="label">מבנה הרשת (טורים · עומק · קומות)</label>
+        <div class="row3">
+          <div><input class="input" type="number" id="set-cols" min="1" max="20"></div>
+          <div><input class="input" type="number" id="set-rows" min="1" max="20"></div>
+          <div><input class="input" type="number" id="set-levels" min="1" max="20"></div>
+        </div>
+        <div class="warn" id="resize-warn"></div>
+      </div>
+      <button class="btn" id="save-settings">שמירת הגדרות</button>
+      <div class="note">🔗 הנתונים משותפים דרך הענן — כל מי שיש לו את הקישור רואה ומעדכן את אותה רשימה, בלי צורך בחשבון או התקנה.</div>
+    </div>
+  </main>
+
+  <button class="fab" id="fab">+</button>
+
+  <div class="tabbar">
+    <button class="tab active" data-tab="3d"><span class="tab-icon">🧊</span>תלת מימד</button>
+    <button class="tab" data-tab="map"><span class="tab-icon">🗺️</span>מפת קומות</button>
+    <button class="tab" data-tab="search"><span class="tab-icon">🔍</span>חיפוש</button>
+    <button class="tab" data-tab="settings"><span class="tab-icon">⚙️</span>הגדרות</button>
+  </div>
+
+  <div class="sheet-backdrop hidden" id="sheet-backdrop">
+    <div class="sheet" id="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title mono" id="sheet-title"></div>
+      <div id="sheet-items"></div>
+      <div class="field">
+        <label class="label">הוספת פריט לתא זה</label>
+        <input class="input" id="f-name" placeholder="שם הפריט" style="margin-bottom:8px">
+        <input class="input" id="f-cat" placeholder="קטגוריה (למשל: כלי עבודה)" list="cats" style="margin-bottom:8px">
+        <datalist id="cats"></datalist>
+        <input class="input" id="f-qty" type="number" min="1" value="1" placeholder="כמות" style="margin-bottom:8px">
+        <input class="input" id="f-notes" placeholder="הערות (אופציונלי)" style="margin-bottom:10px">
+        <button class="btn" style="width:100%" id="f-add">הוספת הפריט</button>
+      </div>
+      <button class="btn secondary" style="width:100%;margin-top:8px" id="sheet-close">סגירה</button>
+    </div>
+  </div>
+</div>
+
+<div id="boot" class="loading">טוען את מפת המכולה...</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ================= State ================= */
+const PALETTE = ["#B5502A","#3E7C7C","#C9A227","#5B6E4F","#7A5C61","#4A5A6B","#8C6B3F","#6E4B87"];
+const FOUND_COLOR = "#F2C230";
+
+let state = {
+  config: { name: "המכולה שלנו", code: "MCLU-0001", cols: 6, rows: 2, levels: 3 },
+  items: []
+};
+let activeTab = "3d";
+let activeLevel = 1;
+let selectedCell = null;
+let sheetCell = null;
+let dirty = false;
+let lastRemoteJSON = "";
+
+const $ = id => document.getElementById(id);
+const keyOf = (c,r,l) => `${c}_${r}_${l}`;
+const dbUrl = () => `${FIREBASE_DB_URL.replace(/\/$/,"")}/${DATA_PATH}.json`;
+
+function categories() {
+  const s = new Set();
+  state.items.forEach(it => it.category && s.add(it.category));
+  return [...s];
+}
+function catColor(cat) {
+  const idx = Math.max(0, categories().indexOf(cat));
+  return PALETTE[idx % PALETTE.length];
+}
+
+/* ================= Sync (Firebase REST) ================= */
+function setSync(mode, text) {
+  const dot = $("sync-dot");
+  dot.className = "sync-dot" + (mode === "err" ? " err" : mode === "busy" ? " busy" : "");
+  $("sync-text").textContent = text;
+}
+
+async function loadRemote() {
+  try {
+    setSync("busy", "טוען...");
+    const res = await fetch(dbUrl());
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    if (data) {
+      const json = JSON.stringify(data);
+      if (json !== lastRemoteJSON) {
+        lastRemoteJSON = json;
+        state = {
+          config: { ...state.config, ...(data.config || {}) },
+          items: Array.isArray(data.items) ? data.items : []
+        };
+        renderAll();
+      }
+    }
+    setSync("ok", "מסונכרן");
+  } catch (e) {
+    setSync("err", "שגיאת רשת");
+  }
+}
+
+let saveTimer = null;
+function scheduleSave() {
+  dirty = true;
+  renderAll();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveRemote, 600);
+}
+async function saveRemote() {
+  try {
+    setSync("busy", "שומר...");
+    const body = JSON.stringify({ config: state.config, items: state.items, updated: Date.now() });
+    const res = await fetch(dbUrl(), { method: "PUT", body });
+    if (!res.ok) throw new Error(res.status);
+    lastRemoteJSON = JSON.stringify({ config: state.config, items: state.items });
+    dirty = false;
+    setSync("ok", "מסונכרן");
+  } catch (e) {
+    setSync("err", "השמירה נכשלה");
+  }
+}
+
+/* ================= 3D ================= */
+let three = null;
+function init3D() {
+  const mount = $("canvas-wrap");
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, mount.clientWidth / mount.clientHeight, 0.1, 500);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(mount.clientWidth, mount.clientHeight);
+  mount.insertBefore(renderer.domElement, mount.firstChild);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+  dir.position.set(5, 8, 6);
+  scene.add(dir);
+
+  const group = new THREE.Group();
+  scene.add(group);
+
+  const sph = { radius: 9, theta: Math.PI / 4, phi: 1.05 };
+  const target = new THREE.Vector3(0, 1, 0);
+  function updateCam() {
+    camera.position.set(
+      target.x + sph.radius * Math.sin(sph.phi) * Math.sin(sph.theta),
+      target.y + sph.radius * Math.cos(sph.phi),
+      target.z + sph.radius * Math.sin(sph.phi) * Math.cos(sph.theta)
+    );
+    camera.lookAt(target);
+  }
+  updateCam();
+
+  const drag = { active: false, lx: 0, ly: 0, moved: false, pinch: 0 };
+  const ray = new THREE.Raycaster();
+
+  function pos(e) {
+    const r = renderer.domElement.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top, cx: t.clientX, cy: t.clientY };
+  }
+  function pinchDist(e) {
+    const [a, b] = e.touches;
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  }
+
+  const el = renderer.domElement;
+  el.addEventListener("touchstart", e => {
+    if (e.touches.length === 2) { drag.pinch = pinchDist(e); drag.active = false; return; }
+    const p = pos(e); drag.active = true; drag.lx = p.cx; drag.ly = p.cy; drag.moved = false;
+  }, { passive: true });
+  el.addEventListener("touchmove", e => {
+    if (e.touches.length === 2) {
+      const d = pinchDist(e);
+      sph.radius = Math.min(Math.max(sph.radius * (drag.pinch / d), 3), 40);
+      drag.pinch = d; updateCam(); return;
+    }
+    if (!drag.active) return;
+    const p = pos(e);
+    const dx = p.cx - drag.lx, dy = p.cy - drag.ly;
+    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+    sph.theta -= dx * 0.006;
+    sph.phi = Math.min(Math.max(sph.phi - dy * 0.006, 0.25), Math.PI - 0.25);
+    drag.lx = p.cx; drag.ly = p.cy; updateCam();
+  }, { passive: true });
+  el.addEventListener("touchend", e => {
+    if (drag.active && !drag.moved) pick(drag.lx, drag.ly);
+    drag.active = false;
+  });
+  el.addEventListener("mousedown", e => { drag.active = true; drag.lx = e.clientX; drag.ly = e.clientY; drag.moved = false; });
+  el.addEventListener("mousemove", e => {
+    if (!drag.active) return;
+    const dx = e.clientX - drag.lx, dy = e.clientY - drag.ly;
+    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+    sph.theta -= dx * 0.006;
+    sph.phi = Math.min(Math.max(sph.phi - dy * 0.006, 0.25), Math.PI - 0.25);
+    drag.lx = e.clientX; drag.ly = e.clientY; updateCam();
+  });
+  window.addEventListener("mouseup", e => {
+    if (drag.active && !drag.moved) pick(e.clientX, e.clientY);
+    drag.active = false;
+  });
+  el.addEventListener("wheel", e => {
+    e.preventDefault();
+    sph.radius = Math.min(Math.max(sph.radius + e.deltaY * 0.01, 3), 40);
+    updateCam();
+  }, { passive: false });
+
+  function pick(cx, cy) {
+    const r = el.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hits = ray.intersectObjects(three.cellMeshes.map(m => m.mesh));
+    if (hits.length) {
+      const hit = three.cellMeshes.find(m => m.mesh === hits[0].object);
+      if (hit) { selectCell(hit.cell); openSheet(hit.cell); }
+    }
+  }
+
+  let selMesh = null;
+  (function loop() {
+    requestAnimationFrame(loop);
+    if (selMesh) {
+      const t = performance.now() * 0.004;
+      const s = 1 + Math.sin(t * 2) * 0.06;
+      selMesh.scale.set(s, s, s);
+      selMesh.material.emissiveIntensity = 0.6 + Math.sin(t * 2) * 0.4;
+    }
+    renderer.render(scene, camera);
+  })();
+
+  new ResizeObserver(() => {
+    camera.aspect = mount.clientWidth / mount.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(mount.clientWidth, mount.clientHeight);
+  }).observe(mount);
+
+  three = { scene, camera, renderer, group, sph, updateCam, cellMeshes: [], setSel: m => selMesh = m };
+}
+
+function rebuild3D() {
+  if (!three) return;
+  const g = three.group;
+  while (g.children.length) {
+    const o = g.children.pop();
+    o.traverse?.(x => { x.geometry?.dispose(); x.material?.dispose(); });
+  }
+  three.cellMeshes = [];
+  three.setSel(null);
+
+  const { cols, rows, levels } = state.config;
+  const sp = 1.15;
+  const W = cols * sp, D = rows * sp, H = levels * sp;
+
+  const shell = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(W + .3, H + .3, D + .3)),
+    new THREE.LineBasicMaterial({ color: 0x6b7580, transparent: true, opacity: .55 })
+  );
+  shell.position.set(0, H / 2, 0);
+  g.add(shell);
+
+  const door = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.PlaneGeometry(W, H)),
+    new THREE.LineBasicMaterial({ color: 0xF2C230, transparent: true, opacity: .8 })
+  );
+  door.position.set(0, H / 2, -D / 2 - .05);
+  g.add(door);
+
+  const byCell = {};
+  state.items.forEach(it => (byCell[keyOf(it.col, it.row, it.level)] ||= []).push(it));
+
+  for (let c = 1; c <= cols; c++) for (let r = 1; r <= rows; r++) for (let l = 1; l <= levels; l++) {
+    const x = (c - 1 - (cols - 1) / 2) * sp;
+    const z = (r - 1 - (rows - 1) / 2) * sp;
+    const y = (l - 1) * sp + .5;
+    const cellItems = byCell[keyOf(c, r, l)];
+    const isSel = selectedCell && selectedCell.col === c && selectedCell.row === r && selectedCell.level === l;
+
+    let color = 0x5a6570, opacity = .12, edgeCol = 0x5A6570, edgeOp = .5;
+    if (cellItems) { color = new THREE.Color(catColor(cellItems[0].category)); opacity = .65; edgeCol = 0x000000; edgeOp = .25; }
+    if (isSel) { color = new THREE.Color(FOUND_COLOR); opacity = .9; edgeCol = 0x000000; edgeOp = .25; }
+
+    const geo = new THREE.BoxGeometry(.85, .85, .85);
+    const mat = new THREE.MeshStandardMaterial({
+      color, transparent: true, opacity,
+      emissive: isSel ? new THREE.Color(FOUND_COLOR) : 0x000000,
+      emissiveIntensity: isSel ? .6 : 0
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: edgeCol, transparent: true, opacity: edgeOp })));
+    g.add(mesh);
+    three.cellMeshes.push({ mesh, cell: { col: c, row: r, level: l } });
+
+    if (isSel) {
+      three.setSel(mesh);
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(.04, .04, H - y + 1, 8),
+        new THREE.MeshBasicMaterial({ color: FOUND_COLOR, transparent: true, opacity: .35 })
+      );
+      beam.position.set(x, y + (H - y + 1) / 2, z);
+      g.add(beam);
+    }
+  }
+  three.sph.radius = Math.max(W, D, H) * 1.6 + 2;
+  three.updateCam();
+}
+
+/* ================= UI render ================= */
+function selectCell(cell) {
+  selectedCell = cell;
+  activeLevel = cell.level;
+  renderAll();
+}
+
+function renderHeader() {
+  $("h-name").textContent = state.config.name;
+  $("h-code").textContent = state.config.code;
+}
+
+function renderLegend() {
+  const cats = categories();
+  $("legend").innerHTML = cats.map(c =>
+    `<div class="legend-item"><span class="dot" style="background:${catColor(c)}"></span>${esc(c)}</div>`
+  ).join("") + (cats.length ? `<div class="legend-item"><span class="dot" style="background:${FOUND_COLOR}"></span>נבחר</div>` : "");
+}
+
+function renderFloor() {
+  const { cols, rows, levels } = state.config;
+  $("level-tabs").innerHTML = Array.from({ length: levels }, (_, i) => i + 1).map(l =>
+    `<button class="level-btn ${l === activeLevel ? "active" : ""}" data-level="${l}">קומה ${l}</button>`
+  ).join("");
+  $("level-tabs").querySelectorAll("button").forEach(b =>
+    b.onclick = () => { activeLevel = +b.dataset.level; renderFloor(); });
+
+  const byCell = {};
+  state.items.forEach(it => (byCell[keyOf(it.col, it.row, it.level)] ||= []).push(it));
+
+  const grid = $("floor-grid");
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  grid.style.maxWidth = `${cols * 62}px`;
+  let html = "";
+  for (let r = 1; r <= rows; r++) for (let c = 1; c <= cols; c++) {
+    const cellItems = byCell[keyOf(c, r, activeLevel)] || [];
+    const filled = cellItems.length > 0;
+    const isSel = selectedCell && selectedCell.col === c && selectedCell.row === r && selectedCell.level === activeLevel;
+    const style = filled ? `background:${catColor(cellItems[0].category)};border-color:${catColor(cellItems[0].category)}` : "";
+    html += `<button class="cell ${filled ? "filled" : ""} ${isSel ? "found" : ""}" style="${style}" data-c="${c}" data-r="${r}">
+      ${cellItems.length > 1 ? `<span class="cell-count">${cellItems.length}</span>` : ""}
+      <span class="mono cell-code">${c}·${r}</span></button>`;
+  }
+  grid.innerHTML = html;
+  grid.querySelectorAll(".cell").forEach(b => b.onclick = () => {
+    const cell = { col: +b.dataset.c, row: +b.dataset.r, level: activeLevel };
+    selectCell(cell); openSheet(cell);
+  });
+}
+
+function renderSearch() {
+  const q = $("search-input").value.trim().toLowerCase();
+  const box = $("search-results");
+  if (!q) { box.innerHTML = `<div class="empty">הקלד/י שם פריט כדי לאתר את מיקומו המדויק במכולה</div>`; return; }
+  const res = state.items.filter(it =>
+    it.name.toLowerCase().includes(q) || (it.category || "").toLowerCase().includes(q));
+  if (!res.length) { box.innerHTML = `<div class="empty">לא נמצאו פריטים תואמים</div>`; return; }
+  box.innerHTML = res.map(it => `
+    <div class="result">
+      <div>
+        <div class="result-name">${esc(it.name)}</div>
+        <div class="result-meta">${esc(it.category || "ללא קטגוריה")} · כמות ${it.qty || 1}${it.notes ? " · " + esc(it.notes) : ""}</div>
+      </div>
+      <button class="result-coord mono" data-id="${it.id}">${it.col}·${it.row}·${it.level}</button>
+    </div>`).join("");
+  box.querySelectorAll(".result-coord").forEach(b => b.onclick = () => {
+    const it = state.items.find(x => x.id === b.dataset.id);
+    if (it) { selectCell({ col: it.col, row: it.row, level: it.level }); switchTab("3d"); }
+  });
+}
+
+function renderSettings() {
+  $("set-name").value = state.config.name;
+  $("set-code").value = state.config.code;
+  $("set-cols").value = state.config.cols;
+  $("set-rows").value = state.config.rows;
+  $("set-levels").value = state.config.levels;
+  $("resize-warn").textContent = state.items.length
+    ? `שים לב: יש כרגע ${state.items.length} פריטים מתויגים. הקטנת הרשת עלולה להסתיר פריטים בתאים שיוסרו.` : "";
+}
+
+function renderSheet() {
+  if (!sheetCell) return;
+  $("sheet-title").textContent = `טור ${sheetCell.col} · עומק ${sheetCell.row} · קומה ${sheetCell.level}`;
+  const items = state.items.filter(it =>
+    it.col === sheetCell.col && it.row === sheetCell.row && it.level === sheetCell.level);
+  $("sheet-items").innerHTML = items.map(it => `
+    <div class="item-row">
+      <div>
+        <div style="font-weight:700">${esc(it.name)}</div>
+        <div class="result-meta">${esc(it.category || "ללא קטגוריה")} · כמות ${it.qty || 1}${it.notes ? " · " + esc(it.notes) : ""}</div>
+      </div>
+      <button class="icon-btn" data-del="${it.id}">מחיקה</button>
+    </div>`).join("");
+  $("sheet-items").querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
+    state.items = state.items.filter(x => x.id !== b.dataset.del);
+    scheduleSave(); renderSheet();
+  });
+  $("cats").innerHTML = categories().map(c => `<option value="${esc(c)}">`).join("");
+}
+
+function esc(s) { return String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
+
+function renderAll() {
+  renderHeader(); renderLegend(); renderFloor(); renderSettings(); rebuild3D();
+  if (activeTab === "search") renderSearch();
+  if (sheetCell && !$("sheet-backdrop").classList.contains("hidden")) renderSheet();
+}
+
+/* ================= Tabs & sheet ================= */
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  $("view-3d").classList.toggle("hidden", tab !== "3d");
+  $("view-map").classList.toggle("hidden", tab !== "map");
+  $("view-search").classList.toggle("hidden", tab !== "search");
+  $("view-settings").classList.toggle("hidden", tab !== "settings");
+  if (tab === "search") { renderSearch(); $("search-input").focus(); }
+}
+function openSheet(cell) {
+  sheetCell = cell;
+  $("sheet-backdrop").classList.remove("hidden");
+  renderSheet();
+}
+function closeSheet() { $("sheet-backdrop").classList.add("hidden"); sheetCell = null; }
+
+/* ================= Boot ================= */
+window.addEventListener("DOMContentLoaded", async () => {
+  $("boot").classList.add("hidden");
+  if (!FIREBASE_DB_URL || FIREBASE_DB_URL.includes("PASTE_YOUR")) {
+    $("setup").classList.remove("hidden");
+    return;
+  }
+  $("app").classList.remove("hidden");
+  init3D();
+
+  document.querySelectorAll(".tab").forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+  $("fab").onclick = () => openSheet(selectedCell || { col: 1, row: 1, level: activeLevel });
+  $("sheet-close").onclick = closeSheet;
+  $("sheet-backdrop").onclick = e => { if (e.target === $("sheet-backdrop")) closeSheet(); };
+  $("search-input").addEventListener("input", renderSearch);
+  $("f-add").onclick = () => {
+    const name = $("f-name").value.trim();
+    if (!name || !sheetCell) return;
+    state.items.push({
+      id: Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+      name, category: $("f-cat").value.trim(),
+      qty: parseInt($("f-qty").value) || 1,
+      notes: $("f-notes").value.trim(),
+      col: sheetCell.col, row: sheetCell.row, level: sheetCell.level
+    });
+    $("f-name").value = ""; $("f-notes").value = ""; $("f-qty").value = 1;
+    scheduleSave(); renderSheet();
+  };
+  $("save-settings").onclick = () => {
+    state.config.name = $("set-name").value.trim() || state.config.name;
+    state.config.code = $("set-code").value.trim() || state.config.code;
+    state.config.cols = Math.max(1, Math.min(20, parseInt($("set-cols").value) || 1));
+    state.config.rows = Math.max(1, Math.min(20, parseInt($("set-rows").value) || 1));
+    state.config.levels = Math.max(1, Math.min(20, parseInt($("set-levels").value) || 1));
+    scheduleSave();
+  };
+
+  await loadRemote();
+  renderAll();
+  setInterval(() => { if (!dirty) loadRemote(); }, 15000); // רענון סנכרון כל 15 שניות
+});
+</script>
+</body>
+</html>
