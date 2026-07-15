@@ -160,6 +160,29 @@
   .qty-stepper .icon-btn { font-size: 16px; font-weight: 700; min-width: 32px; }
   .qty-num { min-width: 22px; text-align: center; font-weight: 700; color: var(--yellow); }
   .item-actions { display: flex; gap: 6px; }
+
+  /* Locate card below the 3D view */
+  .locate-card {
+    position: relative; margin: 8px 10px; z-index: 5;
+    background: #1c2024; border: 1px solid var(--yellow); border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .locate-close {
+    position: absolute; top: 8px; left: 8px; background: var(--panel2);
+    border: 1px solid var(--border); border-radius: 6px; color: var(--text-dim);
+    width: 26px; height: 26px; font-size: 13px; cursor: pointer;
+  }
+  .locate-top { display: flex; align-items: center; gap: 12px; padding-left: 32px; flex-wrap: wrap; }
+  .locate-name { font-weight: 900; font-size: 18px; }
+  .locate-notes { font-size: 15px; font-weight: 500; color: var(--text); margin-top: 4px; }
+  .locate-notes:empty { display: none; }
+  .locate-dirs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .dir-chip {
+    background: var(--yellow); border: none; color: #1a1a1a;
+    border-radius: 8px; padding: 6px 14px; font-size: 16px; font-weight: 900;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .locate-qty { display: flex; align-items: center; gap: 8px; }
   .loading { text-align: center; padding: 60px 20px; color: var(--text-dim); }
   .setup-box { max-width: 480px; margin: 40px auto; padding: 0 16px; }
   .hidden { display: none !important; }
@@ -201,6 +224,19 @@
     <div id="view-3d">
       <div class="canvas-wrap" id="canvas-wrap">
         <div class="hint">גרירה לסיבוב · צביטה/גלגלת לזום · הקשה על תא לפרטים</div>
+      </div>
+      <div class="locate-card hidden" id="locate-card">
+        <button class="locate-close" id="locate-close">✕</button>
+        <div class="locate-top">
+          <span class="locate-name" id="locate-name"></span>
+          <span class="locate-qty">
+            <button class="icon-btn" id="locate-minus">−</button>
+            <span class="qty-num mono" id="locate-qty-num"></span>
+            <button class="icon-btn" id="locate-plus">+</button>
+          </span>
+        </div>
+        <div class="locate-notes" id="locate-notes"></div>
+        <div class="locate-dirs" id="locate-dirs"></div>
       </div>
       <div class="legend" id="legend"></div>
     </div>
@@ -283,6 +319,7 @@ let state = {
 let activeTab = "3d";
 let activeLevel = 1;
 let selectedCell = null;
+let focusItemId = null;
 let sheetCell = null;
 let editingId = null;
 let dirty = false;
@@ -313,7 +350,42 @@ function catColor(cat) {
   return PALETTE[idx % PALETTE.length];
 }
 
-/* ================= Sync (Firebase REST) ================= */
+/* ================= Locate card & directions ================= */
+function directionChips(cell) {
+  const { cols, rows, levels } = state.config;
+  const chips = [];
+  if (rows > 1) {
+    if (cell.row === 1) chips.push("צמוד לכניסה");
+    else if (cell.row === rows) chips.push("מאחורה");
+    else chips.push("באמצע העומק");
+  }
+  if (levels > 1) {
+    if (cell.level === 1) chips.push("🔻 למטה");
+    else if (cell.level === levels) chips.push("🔺 למעלה");
+    else chips.push(`קומה ${cell.level}`);
+  }
+  if (cols > 1) {
+    const third = cols / 3;
+    if (cell.col <= third) chips.push("➡️ ימין");
+    else if (cell.col > cols - third) chips.push("⬅️ שמאל");
+    else chips.push("במרכז");
+  }
+  return chips;
+}
+
+function renderLocateCard() {
+  const card = $("locate-card");
+  const it = focusItemId ? state.items.find(x => x.id === focusItemId) : null;
+  if (!it) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  $("locate-name").textContent = it.name;
+  $("locate-notes").textContent = [it.notes, it.category].filter(Boolean).join(" · ");
+  $("locate-dirs").innerHTML =
+    directionChips(it).map(t => `<span class="dir-chip">${t}</span>`).join("");
+  $("locate-qty-num").textContent = it.qty || 1;
+}
+
+
 function setSync(mode, text) {
   const dot = $("sync-dot");
   dot.className = "sync-dot" + (mode === "err" ? " err" : mode === "busy" ? " busy" : "");
@@ -462,13 +534,17 @@ function init3D() {
   }
 
   let selMesh = null;
+  let arrowObj = null, arrowBaseY = 0;
   (function loop() {
     requestAnimationFrame(loop);
+    const t = performance.now() * 0.004;
     if (selMesh) {
-      const t = performance.now() * 0.004;
       const s = 1 + Math.sin(t * 2) * 0.06;
       selMesh.scale.set(s, s, s);
       selMesh.material.emissiveIntensity = 0.6 + Math.sin(t * 2) * 0.4;
+    }
+    if (arrowObj) {
+      arrowObj.position.y = arrowBaseY + Math.sin(t * 2.2) * 0.18;
     }
     renderer.render(scene, camera);
   })();
@@ -479,7 +555,9 @@ function init3D() {
     renderer.setSize(mount.clientWidth, mount.clientHeight);
   }).observe(mount);
 
-  three = { scene, camera, renderer, group, sph, updateCam, cellMeshes: [], setSel: m => selMesh = m };
+  three = { scene, camera, renderer, group, sph, updateCam, cellMeshes: [],
+    setSel: m => selMesh = m,
+    setArrow: (a, baseY) => { arrowObj = a; arrowBaseY = baseY; } };
 }
 
 function rebuild3D() {
@@ -491,6 +569,7 @@ function rebuild3D() {
   }
   three.cellMeshes = [];
   three.setSel(null);
+  three.setArrow(null, 0);
 
   const { cols, rows, levels } = state.config;
   const sp = 1.15;
@@ -562,6 +641,24 @@ function rebuild3D() {
       );
       beam.position.set(x, y + (H - y + 1) / 2, z);
       g.add(beam);
+
+      // bobbing arrow pointing down at the cell
+      const arrow = new THREE.Group();
+      const head = new THREE.Mesh(
+        new THREE.ConeGeometry(.28, .5, 12),
+        new THREE.MeshStandardMaterial({ color: FOUND_COLOR, emissive: FOUND_COLOR, emissiveIntensity: .5 })
+      );
+      head.rotation.x = Math.PI; // point down
+      head.position.y = 0;
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(.09, .09, .55, 10),
+        new THREE.MeshStandardMaterial({ color: FOUND_COLOR, emissive: FOUND_COLOR, emissiveIntensity: .5 })
+      );
+      shaft.position.y = .5;
+      arrow.add(head); arrow.add(shaft);
+      arrow.position.set(x, y + 1.15, z);
+      g.add(arrow);
+      three.setArrow(arrow, y + 1.15);
     }
   }
   three.sph.radius = Math.max(W, D, H) * 1.6 + 2;
@@ -635,7 +732,12 @@ function renderSearch() {
     </div>`).join("");
   box.querySelectorAll(".result").forEach(row => row.onclick = () => {
     const it = state.items.find(x => x.id === row.dataset.id);
-    if (it) { selectCell({ col: it.col, row: it.row, level: it.level }); switchTab("3d"); }
+    if (it) {
+      focusItemId = it.id;
+      selectCell({ col: it.col, row: it.row, level: it.level });
+      switchTab("3d");
+      renderLocateCard();
+    }
   });
 }
 
@@ -702,7 +804,7 @@ function renderSheet() {
 function esc(s) { return String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
 
 function renderAll() {
-  renderHeader(); renderLegend(); renderFloor(); renderSettings(); rebuild3D();
+  renderHeader(); renderLegend(); renderFloor(); renderSettings(); rebuild3D(); renderLocateCard();
   if (activeTab === "search") renderSearch();
   if (sheetCell && !$("sheet-backdrop").classList.contains("hidden")) renderSheet();
 }
@@ -764,6 +866,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     scheduleSave(); renderSheet();
   };
   $("f-cancel").onclick = cancelEdit;
+  $("locate-close").onclick = () => { focusItemId = null; renderLocateCard(); };
+  $("locate-minus").onclick = () => {
+    const it = state.items.find(x => x.id === focusItemId);
+    if (it) { it.qty = Math.max(0, (it.qty || 1) - 1); scheduleSave(); }
+  };
+  $("locate-plus").onclick = () => {
+    const it = state.items.find(x => x.id === focusItemId);
+    if (it) { it.qty = (it.qty || 1) + 1; scheduleSave(); }
+  };
   $("save-settings").onclick = () => {
     state.config.name = $("set-name").value.trim() || state.config.name;
     state.config.code = $("set-code").value.trim() || state.config.code;
