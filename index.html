@@ -161,6 +161,26 @@
   .qty-num { min-width: 22px; text-align: center; font-weight: 700; color: var(--yellow); }
   .item-actions { display: flex; gap: 6px; }
 
+  .menu-btn {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 18px; width: 40px; height: 40px; cursor: pointer;
+  }
+  .search-bar { position: relative; padding: 10px 14px 4px; z-index: 15; }
+  .search-drop {
+    position: absolute; left: 14px; right: 14px; top: 100%;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+    max-height: 45vh; overflow-y: auto; box-shadow: 0 10px 26px #00000080;
+  }
+  .search-drop:empty { display: none; }
+  .search-drop .result { margin: 6px; }
+  .locate-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 10px; margin-top: 8px; flex-wrap: wrap;
+  }
+  .locate-item .nm { font-weight: 900; font-size: 16px; }
+  .locate-item .nt { font-size: 13px; color: var(--text); }
+
   /* Locate card below the 3D view */
   .locate-card {
     position: relative; margin: 8px 10px; z-index: 5;
@@ -210,9 +230,12 @@
 
 <div id="app" class="hidden">
   <header>
-    <div>
-      <div class="title" id="h-name">המכולה שלנו</div>
-      <div class="code mono" id="h-code">MCLU-0001</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="menu-btn" id="menu-btn">☰</button>
+      <div>
+        <div class="title" id="h-name">המכולה שלנו</div>
+        <div class="code mono" id="h-code">MCLU-0001</div>
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="sync"><span class="sync-dot" id="sync-dot"></span><span id="sync-text">מסונכרן</span></div>
@@ -220,39 +243,32 @@
     </div>
   </header>
 
+  <div class="search-bar">
+    <input class="input" id="search-input" placeholder="🔍 חיפוש פריט או קטגוריה...">
+    <div id="search-results" class="search-drop"></div>
+  </div>
+
   <main>
     <div id="view-3d">
       <div class="canvas-wrap" id="canvas-wrap">
-        <div class="hint">גרירה לסיבוב · צביטה/גלגלת לזום · הקשה על תא לפרטים</div>
+        <div class="hint">גרירה לסיבוב · צביטה/גלגלת לזום · הקשה על תא — מציג את מיקומו</div>
       </div>
       <div class="locate-card hidden" id="locate-card">
         <button class="locate-close" id="locate-close">✕</button>
-        <div class="locate-top">
-          <span class="locate-name" id="locate-name"></span>
-          <span class="locate-qty">
-            <button class="icon-btn" id="locate-minus">−</button>
-            <span class="qty-num mono" id="locate-qty-num"></span>
-            <button class="icon-btn" id="locate-plus">+</button>
-          </span>
-        </div>
-        <div class="locate-notes" id="locate-notes"></div>
         <div class="locate-dirs" id="locate-dirs"></div>
+        <div id="locate-items"></div>
+        <button class="btn secondary" style="width:100%;margin-top:8px" id="locate-open">עריכה / הוספת פריטים לתא</button>
       </div>
       <div class="legend" id="legend"></div>
     </div>
+  </main>
 
-    <div id="view-map" class="section hidden">
-      <div class="level-tabs" id="level-tabs"></div>
-      <div class="grid" id="floor-grid"></div>
-      <div class="warn">הקצה המסומן בצהוב בתלת־מימד = דלת המכולה. הקש/י על תא כדי לראות או להוסיף פריטים.</div>
-    </div>
+  <button class="fab" id="fab">+</button>
 
-    <div id="view-search" class="section hidden">
-      <input class="input" id="search-input" placeholder="חיפוש פריט או קטגוריה...">
-      <div id="search-results"></div>
-    </div>
-
-    <div id="view-settings" class="section hidden">
+  <div class="sheet-backdrop hidden" id="settings-backdrop">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">⚙️ הגדרות</div>
       <div class="field">
         <label class="label">שם המכולה</label>
         <input class="input" id="set-name">
@@ -270,18 +286,10 @@
         </div>
         <div class="warn" id="resize-warn"></div>
       </div>
-      <button class="btn" id="save-settings">שמירת הגדרות</button>
+      <button class="btn" style="width:100%" id="save-settings">שמירת הגדרות</button>
+      <button class="btn secondary" style="width:100%;margin-top:8px" id="settings-close">סגירה</button>
       <div class="note">🔗 הנתונים משותפים דרך הענן — כל מי שיש לו את הקישור רואה ומעדכן את אותה רשימה, בלי צורך בחשבון או התקנה.</div>
     </div>
-  </main>
-
-  <button class="fab" id="fab">+</button>
-
-  <div class="tabbar">
-    <button class="tab active" data-tab="3d"><span class="tab-icon">🧊</span>תלת מימד</button>
-    <button class="tab" data-tab="map"><span class="tab-icon">🗺️</span>מפת קומות</button>
-    <button class="tab" data-tab="search"><span class="tab-icon">🔍</span>חיפוש</button>
-    <button class="tab" data-tab="settings"><span class="tab-icon">⚙️</span>הגדרות</button>
   </div>
 
   <div class="sheet-backdrop hidden" id="sheet-backdrop">
@@ -319,7 +327,7 @@ let state = {
 let activeTab = "3d";
 let activeLevel = 1;
 let selectedCell = null;
-let focusItemId = null;
+let focusCell = null;
 let sheetCell = null;
 let editingId = null;
 let dirty = false;
@@ -375,14 +383,34 @@ function directionChips(cell) {
 
 function renderLocateCard() {
   const card = $("locate-card");
-  const it = focusItemId ? state.items.find(x => x.id === focusItemId) : null;
-  if (!it) { card.classList.add("hidden"); return; }
+  if (!focusCell) { card.classList.add("hidden"); return; }
   card.classList.remove("hidden");
-  $("locate-name").textContent = it.name;
-  $("locate-notes").textContent = [it.notes, it.category].filter(Boolean).join(" · ");
   $("locate-dirs").innerHTML =
-    directionChips(it).map(t => `<span class="dir-chip">${t}</span>`).join("");
-  $("locate-qty-num").textContent = it.qty || 1;
+    directionChips(focusCell).map(t => `<span class="dir-chip">${t}</span>`).join("");
+  const items = state.items.filter(it =>
+    it.col === focusCell.col && it.row === focusCell.row && it.level === focusCell.level);
+  $("locate-items").innerHTML = items.length
+    ? items.map(it => `
+      <div class="locate-item">
+        <div style="flex:1;min-width:0">
+          <div class="nm">${esc(it.name)}</div>
+          ${it.notes || it.category ? `<div class="nt">${esc([it.notes, it.category].filter(Boolean).join(" · "))}</div>` : ""}
+        </div>
+        <span class="locate-qty">
+          <button class="icon-btn" data-lminus="${it.id}">−</button>
+          <span class="qty-num mono">${it.qty || 1}</span>
+          <button class="icon-btn" data-lplus="${it.id}">+</button>
+        </span>
+      </div>`).join("")
+    : `<div class="empty" style="padding:12px">תא ריק — אפשר להוסיף אליו פריטים</div>`;
+  $("locate-items").querySelectorAll("[data-lminus]").forEach(b => b.onclick = () => {
+    const it = state.items.find(x => x.id === b.dataset.lminus);
+    if (it) { it.qty = Math.max(0, (it.qty || 1) - 1); scheduleSave(); }
+  });
+  $("locate-items").querySelectorAll("[data-lplus]").forEach(b => b.onclick = () => {
+    const it = state.items.find(x => x.id === b.dataset.lplus);
+    if (it) { it.qty = (it.qty || 1) + 1; scheduleSave(); }
+  });
 }
 
 
@@ -529,7 +557,7 @@ function init3D() {
     const hits = ray.intersectObjects(three.cellMeshes.map(m => m.mesh));
     if (hits.length) {
       const hit = three.cellMeshes.find(m => m.mesh === hits[0].object);
-      if (hit) { selectCell(hit.cell); openSheet(hit.cell); }
+      if (hit) { focusCell = hit.cell; selectCell(hit.cell); }
     }
   }
 
@@ -684,41 +712,10 @@ function renderLegend() {
   ).join("") + (cats.length ? `<div class="legend-item"><span class="dot" style="background:${FOUND_COLOR}"></span>נבחר</div>` : "");
 }
 
-function renderFloor() {
-  const { cols, rows, levels } = state.config;
-  $("level-tabs").innerHTML = Array.from({ length: levels }, (_, i) => i + 1).map(l =>
-    `<button class="level-btn ${l === activeLevel ? "active" : ""}" data-level="${l}">קומה ${l}</button>`
-  ).join("");
-  $("level-tabs").querySelectorAll("button").forEach(b =>
-    b.onclick = () => { activeLevel = +b.dataset.level; renderFloor(); });
-
-  const byCell = {};
-  state.items.forEach(it => (byCell[keyOf(it.col, it.row, it.level)] ||= []).push(it));
-
-  const grid = $("floor-grid");
-  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  grid.style.maxWidth = `${cols * 62}px`;
-  let html = "";
-  for (let r = 1; r <= rows; r++) for (let c = 1; c <= cols; c++) {
-    const cellItems = byCell[keyOf(c, r, activeLevel)] || [];
-    const filled = cellItems.length > 0;
-    const isSel = selectedCell && selectedCell.col === c && selectedCell.row === r && selectedCell.level === activeLevel;
-    const style = filled ? `background:${catColor(cellItems[0].category)};border-color:${catColor(cellItems[0].category)}` : "";
-    html += `<button class="cell ${filled ? "filled" : ""} ${isSel ? "found" : ""}" style="${style}" data-c="${c}" data-r="${r}">
-      ${cellItems.length > 1 ? `<span class="cell-count">${cellItems.length}</span>` : ""}
-      <span class="mono cell-code">${c}·${r}</span></button>`;
-  }
-  grid.innerHTML = html;
-  grid.querySelectorAll(".cell").forEach(b => b.onclick = () => {
-    const cell = { col: +b.dataset.c, row: +b.dataset.r, level: activeLevel };
-    selectCell(cell); openSheet(cell);
-  });
-}
-
 function renderSearch() {
   const q = $("search-input").value.trim().toLowerCase();
   const box = $("search-results");
-  if (!q) { box.innerHTML = `<div class="empty">הקלד/י שם פריט כדי לאתר את מיקומו המדויק במכולה</div>`; return; }
+  if (!q) { box.innerHTML = ""; return; }
   const res = state.items.filter(it =>
     it.name.toLowerCase().includes(q) || (it.category || "").toLowerCase().includes(q));
   if (!res.length) { box.innerHTML = `<div class="empty">לא נמצאו פריטים תואמים</div>`; return; }
@@ -733,10 +730,10 @@ function renderSearch() {
   box.querySelectorAll(".result").forEach(row => row.onclick = () => {
     const it = state.items.find(x => x.id === row.dataset.id);
     if (it) {
-      focusItemId = it.id;
-      selectCell({ col: it.col, row: it.row, level: it.level });
-      switchTab("3d");
-      renderLocateCard();
+      focusCell = { col: it.col, row: it.row, level: it.level };
+      $("search-input").value = "";
+      box.innerHTML = "";
+      selectCell(focusCell);
     }
   });
 }
@@ -804,21 +801,12 @@ function renderSheet() {
 function esc(s) { return String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
 
 function renderAll() {
-  renderHeader(); renderLegend(); renderFloor(); renderSettings(); rebuild3D(); renderLocateCard();
-  if (activeTab === "search") renderSearch();
+  renderHeader(); renderLegend(); renderSettings(); rebuild3D(); renderLocateCard();
+  renderSearch();
   if (sheetCell && !$("sheet-backdrop").classList.contains("hidden")) renderSheet();
 }
 
-/* ================= Tabs & sheet ================= */
-function switchTab(tab) {
-  activeTab = tab;
-  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-  $("view-3d").classList.toggle("hidden", tab !== "3d");
-  $("view-map").classList.toggle("hidden", tab !== "map");
-  $("view-search").classList.toggle("hidden", tab !== "search");
-  $("view-settings").classList.toggle("hidden", tab !== "settings");
-  if (tab === "search") { renderSearch(); $("search-input").focus(); }
-}
+/* ================= Sheet & settings modal ================= */
 function openSheet(cell) {
   sheetCell = cell;
   $("sheet-backdrop").classList.remove("hidden");
@@ -836,8 +824,10 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("app").classList.remove("hidden");
   init3D();
 
-  document.querySelectorAll(".tab").forEach(b => b.onclick = () => switchTab(b.dataset.tab));
-  $("fab").onclick = () => openSheet(selectedCell || { col: 1, row: 1, level: activeLevel });
+  $("menu-btn").onclick = () => { renderSettings(); $("settings-backdrop").classList.remove("hidden"); };
+  $("settings-close").onclick = () => $("settings-backdrop").classList.add("hidden");
+  $("settings-backdrop").onclick = e => { if (e.target === $("settings-backdrop")) $("settings-backdrop").classList.add("hidden"); };
+  $("fab").onclick = () => openSheet(focusCell || selectedCell || { col: 1, row: 1, level: activeLevel });
   $("sheet-close").onclick = closeSheet;
   $("sheet-backdrop").onclick = e => { if (e.target === $("sheet-backdrop")) closeSheet(); };
   $("search-input").addEventListener("input", renderSearch);
@@ -866,15 +856,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     scheduleSave(); renderSheet();
   };
   $("f-cancel").onclick = cancelEdit;
-  $("locate-close").onclick = () => { focusItemId = null; renderLocateCard(); };
-  $("locate-minus").onclick = () => {
-    const it = state.items.find(x => x.id === focusItemId);
-    if (it) { it.qty = Math.max(0, (it.qty || 1) - 1); scheduleSave(); }
-  };
-  $("locate-plus").onclick = () => {
-    const it = state.items.find(x => x.id === focusItemId);
-    if (it) { it.qty = (it.qty || 1) + 1; scheduleSave(); }
-  };
+  $("locate-close").onclick = () => { focusCell = null; renderLocateCard(); };
+  $("locate-open").onclick = () => { if (focusCell) openSheet(focusCell); };
   $("save-settings").onclick = () => {
     state.config.name = $("set-name").value.trim() || state.config.name;
     state.config.code = $("set-code").value.trim() || state.config.code;
